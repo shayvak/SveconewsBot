@@ -1,0 +1,41 @@
+name: Market News Scanner
+
+on:
+  schedule:
+    # רץ כל 10 דקות. בתוכניות חינמיות של GitHub, ייתכן עיכוב של כמה דקות
+    # בשעות עומס (זה לא real-time מדויק, אלא "כמעט בזמן אמת").
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}   # מאפשר הרצה ידנית מהטאב Actions ב-GitHub, לבדיקה
+
+permissions:
+  contents: write   # נדרש כדי שהסקריפט יוכל לשמור (לקמיט) את קובץ ה-state
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scanner
+        run: python main.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Save state (commit seen_ids.json if changed)
+        run: |
+          git config user.name "market-scanner-bot"
+          git config user.email "actions@github.com"
+          git add seen_ids.json
+          git diff --staged --quiet || git commit -m "update seen ids [skip ci]"
+          git push
